@@ -8,8 +8,8 @@ public:
 
   enum
   {
-    BITSET_STACK_SIZE = sizeof(bitset_stack),
-    BITWORD_SIZE = sizeof(bits_ptr_t)
+    BITSET_STACK_SIZE = sizeof(bitset_stack)*CHAR_BIT,
+    BITWORD_SIZE = sizeof(bits_ptr_t)*CHAR_BIT
   };
 
   /* Reference to a single bit.
@@ -28,6 +28,8 @@ public:
     /* Reference to the i-th bit in the bitset B. */
     ref(bitset *b, unsigned i)
     {
+      bitword_ptr = b->bits_ptr[i/BITWORD_SIZE];
+      idx = i%BITWORD_SIZE;
     }
 
     ref(const ref&) = default;
@@ -53,14 +55,24 @@ public:
 
     ref &operator=(ref t)
     {
+      *this = bool(t);
+      return *this;
     }
 
     ref &operator=(bool t)
     {
+      bitword_ptr_t &bitword = *bitword_ptr;
+      bitword_ptr_t mask = bitword_ptr_t(1) << idx;
+      if (t)
+        bitwordr |= mask;
+      else
+        bitword &= ~mask;
+      return *this;
     }
 
     operator bool() const
     {
+      return (*bitword_ptr) & (bitword_ptr_t(1) << idx);
     }
   };
 
@@ -127,16 +139,32 @@ public:
   /* Invert one bit in the bitset. */
   void invert(unsigned i)
   {
+    bits_ptr[i/BITWORD_SIZE] ^= bits_ptr_t(1) << (i % BITWORD_SIZE);
   }
 
-  /* Invert a range of bits in the bitset. */
-  void invert(unsigned i, unsigned j)
+  /* Invert a range of bits in the bitset.
+     End is one past the end element we want to invert. */
+  void invert(unsigned beg, unsigned end)
   {
+    assert(beg < end);
+    unsigned pro_end = beg + (BITWORD_SIZE - beg % BITWORD_SIZE) % BITWORD_SIZE;
+    unsigned epi_end = end % BITWORD_SIZE;
+    for (unsigned i = beg; i < pro_end; ++i)
+      invert(i);
+    assert(!(pro_end % BITWORD_SIZE));
+
+    for (unsigned i = 0; i < (end-beg)/BITWORD_SIZE; ++i)
+      bits_ptr[i+beg/BITWORD_SIZE+1] = ~bits_ptr[i+beg/BITWORD_SIZE+1];
+
+
+    for (unsigned i = 0; i < epi_end; ++i)
+      invert(end-i-1);
   }
 
   /* Invert all the bits in the bitset. */
   void invert()
   {
+    invert(0, bitset_size);
   }
 
   /* Set one bit in the bitset. */
