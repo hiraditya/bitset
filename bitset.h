@@ -3,31 +3,21 @@
 */
 
 class bitset {
+public:
   typedef unsigned long bits_ptr_t;
 
   enum
   {
-    BITS_STACK_SIZE = sizeof(bits_stack),
+    BITSET_STACK_SIZE = sizeof(bitset_stack),
     BITWORD_SIZE = sizeof(bits_ptr_t)
   };
-
-  /* Pointer to the actual bits.  */
-  bits_ptr_t *bits_ptr;
-  /* For small bitsets, the size is fixed.
-     TODO: make bits an array and the size can be passed as template param.  */
-  bits_ptr_t bits_stack;
-  /* Size of storage in bytes. */
-  unsigned bitset_size;
-  /* Capacity of storage in bytes. */
-  unsigned bitset_capacity;
-
-public:
 
   /* Reference to a single bit.
      This is useful for indexing a bit in the bitset. */
   class ref
   {
     friend class bitset;
+    /* Index of bit in the bitword. */
     unsigned idx;
     bits_ptr_t *bitword_ptr;
 
@@ -35,12 +25,31 @@ public:
     ref();
   
   public:
-    /* Reference to the i-th bit in the bitset. */
+    /* Reference to the i-th bit in the bitset B. */
     ref(bitset *b, unsigned i)
     {
     }
 
     ref(const ref&) = default;
+
+    /* Get a reference to the I-th bit in the bitset B. */
+    const ref& get(bitset *b, unsigned i)
+    {
+      // TODO: Check this?
+      bits_ptr_t *bp = b->bits_ptr[i/BITWORD_SIZE];
+      unsigned ip = i%BITWORD_SIZE;
+      /* If pointing to the same bitword. */
+      if (bitword_ptr == bp)
+      {
+        /* If pointing to the same bit. */
+        if (idx == ip)
+          return *this;
+        idx = ip;
+        return *this;
+      }
+      bitword_ptr = bp;
+      idx = ip;
+    }
 
     ref &operator=(ref t)
     {
@@ -55,22 +64,40 @@ public:
     }
   };
 
+private:
+  /* Pointer to the actual bits.  */
+  bits_ptr_t *bits_ptr;
+  /* For small bitsets, the size is fixed.
+     TODO: make bits an array and the size can be passed as template param.  */
+  bits_ptr_t bitset_stack;
+  /* Size of storage in bytes. */
+  unsigned bitset_size;
+  /* Capacity of storage in bytes. */
+  unsigned bitset_capacity;
+
+  /* Reference to a bit. */
+  ref bits_ref;
+
+public:
+
   bitset()
-      : bits_ptr(&bits_stack), bits_stack(0),
-        bitset_size(BITS_STACK_SIZE), bitset_capacity(bitset_size)
+    : bits_ptr(&bitset_stack), bitset_stack(0),
+      bitset_size(BITSET_STACK_SIZE), bitset_capacity(bitset_size),
+      bits_ref(this, 0)
   { }
 
   bitset(unsigned s, bool v = false)
+    : bits_ref(this, 0)
   {
     bitset_size = calc_bitset_size(s);
     bitset_capacity = bitset_size;
-    if (bitset_size > calc_bitset_size(BITS_STACK_SIZE*CHAR_BIT))
+    if (bitset_size > calc_bitset_size(BITSET_STACK_SIZE*CHAR_BIT))
     {
       bits_ptr = (bits_ptr_t*)XCNEW(bitset_size);
     }
     else
     {
-      bits_ptr = &bits_stack;
+      bits_ptr = &bitset_stack;
     }
     init_bitset(bits_ptr, v, bitset_capacity);
   }
@@ -155,10 +182,12 @@ public:
   /* Indexing operator defined in terms of class ref. */
   ref operator[](unsigned i)
   {
+    return bits_ref.get(this, i);
   }
 
   bool operator[](unsigned i) const
   {
+    return bool(bits_ref.get(this, i));
   }
 
   const bitset& operator=(const bitset& b)
