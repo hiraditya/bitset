@@ -26,7 +26,9 @@ public:
 
   enum
   {
+    /* Number of bits in BITSET_STACK */
     BITSET_STACK_SIZE = sizeof(bitset_stack)*CHAR_BIT,
+    /* Number of bits in a word. */
     BITWORD_SIZE = sizeof(bits_ptr_t)*CHAR_BIT
   };
 
@@ -118,18 +120,19 @@ public:
   bitset(unsigned s, bool v = false)
     : bits_ref(this, 0)
   {
-    bitset_size = calc_bitset_size(s);
-    bitset_capacity = bitset_size;
-    unsigned num_bytes = calc_bitset_size(bitset_size)/sizeof(bits_ptr_t);
-    if (bitset_size > calc_bitset_size(BITSET_STACK_SIZE*CHAR_BIT))
+    unsigned num_bytes = bitword_size_bytes(s);
+    if (s > BITSET_STACK_SIZE)
     {
-      //bits_ptr = (bits_ptr_t*)XCNEW(bitset_size);
+      //bits_ptr = (bits_ptr_t*)XCNEW(num_bytes);
       bits_ptr = (bits_ptr_t*)std::malloc(num_bytes);
     }
     else
     {
       bits_ptr = &bitset_stack;
     }
+    assert(bits_ptr != NULL);
+    bitset_capacity = num_bitwords(s)*BITWORD_SIZE;
+    bitset_size = s;
     init_bitset(bits_ptr, v, num_bytes);
   }
 
@@ -140,9 +143,20 @@ public:
   }
 
   /* Number of bitwords required for S bits. */
-  unsigned calc_bitset_size(unsigned s) const
+  unsigned num_bitwords(unsigned s) const
   {
-    return (s + BITWORD_SIZE - 1)/BITWORD_SIZE;
+    unsigned t = (s + BITWORD_SIZE - 1)/BITWORD_SIZE;
+    // TODO: Remove after testing.
+    assert(!(t % CHAR_BIT));
+    return t;
+  }
+
+  /* Size of bitwords in #bytes.
+     FIXME: Can division and mult interchange?
+     If yes, then inlining can cause trouble here. */
+  unsigned bitword_size_bytes(unsigned s) const
+  {
+    return num_bitwords(s)*BITWORD_SIZE/CHAR_BIT;
   }
 
   void init_bitset(bits_ptr_t *p, bool v, unsigned num)
@@ -159,6 +173,26 @@ public:
   /* Returns capacity in #bits */
   unsigned capacity() const
   {
+    return bitset_capacity;
+  }
+
+  /* Resizes the bitset so that it can hold minumum of CAPACITY bits.
+     Does not initialize the values. */
+  unsigned resize(unsigned capacity)
+  {
+    /* When there is enough space then no need to reallocate.
+       This however, can be inefficient in cases when the bitset
+       has hold on to large memory (this should be quite uncommon). */
+    if (bitset_capacity >= capacity)
+      return bitset_capacity;
+
+    /* Since bitset_capacity is atleast BITWORD_STACK_SIZE big,
+       we would always malloc at this point. */
+    if (bits_ptr != &bitset_stack)
+      free(bits_ptr);
+    bits_ptr = (bits_ptr_t*)std::malloc(bitword_size_bytes(capacity));
+    assert(bits_ptr != NULL);
+    bitset_capacity = num_bitwords(capacity);
     return bitset_capacity;
   }
 
@@ -252,11 +286,24 @@ public:
 
   const bitset& operator=(const bitset& b)
   {
+    bitset_size = b.bitset_size;
+    bitset_capacity = resize(b.bitset_capacity);
+
+    assert(bitset_capacity >= b.bitset_capacity);
+
+    memcpy(bits_ptr, b.bits_ptr, bitword_size_bytes(b.bitset_size));
+    return *this;
   }
 
-  /* Equality comparison. */
+  /* Equality comparison. Strict equality comparison. */
   bool operator==(const bitset& b) const
   {
+    if (bitset_size != b.bitset_size)
+      return false;
+    for (unsigned i = 0; i < bitset_size; ++i)
+      if (bits_ptr[i] != b.bits_ptr[i])
+        return false;
+    return true;
   }
 
   bool operator!=(const bitset& b) const
@@ -268,7 +315,7 @@ public:
   bitset& operator|=(const bitset& b)
   {
     assert(bitset_size == b.bitset_size);
-    for (unsigned i = 0; i < calc_bitset_size(bitset_size); ++i)
+    for (unsigned i = 0; i < num_bitwords(bitset_size); ++i)
       bits_ptr[i] |= b.bits_ptr[i];
     return *this;
   }
@@ -276,7 +323,7 @@ public:
   bitset& operator&=(const bitset& b)
   {
     assert(bitset_size == b.bitset_size);
-    for (unsigned i = 0; i < calc_bitset_size(bitset_size); ++i)
+    for (unsigned i = 0; i < num_bitwords(bitset_size); ++i)
       bits_ptr[i] &= b.bits_ptr[i];
     return *this;
   }
@@ -284,7 +331,7 @@ public:
   bitset& operator^=(const bitset& b)
   {
     assert(bitset_size == b.bitset_size);
-    for (unsigned i = 0; i < calc_bitset_size(bitset_size); ++i)
+    for (unsigned i = 0; i < num_bitwords(bitset_size); ++i)
       bits_ptr[i] ^= b.bits_ptr[i];
     return *this;
   }
