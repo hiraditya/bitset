@@ -245,7 +245,7 @@ public:
   {
     if (beg % BITWORD_SIZE)
     {
-      unsigned pref = BITWORD_ONES >> (beg % BITWORD_SIZE);
+      bits_ptr_t pref = BITWORD_ONES >> (beg % BITWORD_SIZE);
       bits_ptr[beg/BITWORD_SIZE] |= pref;
     }
 
@@ -258,7 +258,7 @@ public:
 
     if (end % BITWORD_SIZE)
     {
-      unsigned suff = BITWORD_ONES << (BITWORD_SIZE - end % BITWORD_ONES);
+      bits_ptr_t suff = BITWORD_ONES << (BITWORD_SIZE - end % BITWORD_ONES);
       bits_ptr[end/BITWORD_SIZE] |= suff;
     }
   }
@@ -280,7 +280,7 @@ public:
   {
     if (beg % BITWORD_SIZE)
     {
-      unsigned pref = BITWORD_ONES << (BITWORD_SIZE - beg % BITWORD_SIZE);
+      bits_ptr_t pref = BITWORD_ONES << (BITWORD_SIZE - beg % BITWORD_SIZE);
       bits_ptr[beg/BITWORD_SIZE] &= pref;
     }
 
@@ -293,7 +293,7 @@ public:
 
     if (end % BITWORD_SIZE)
     {
-      unsigned suff = BITWORD_ONES >> (end % BITWORD_ONES);
+      bits_ptr_t suff = BITWORD_ONES >> (end % BITWORD_ONES);
       bits_ptr[end/BITWORD_SIZE] &= suff;
     }
   }
