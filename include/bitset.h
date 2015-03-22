@@ -2,9 +2,27 @@
   Bitset implementation.
 */
 
+#include<climits>
+#include<cassert>
+#include<cstdlib>
+#include<cstring>
+
 class bitset {
 public:
   typedef unsigned long bits_ptr_t;
+
+private:
+  /* Pointer to the actual bits.  */
+  bits_ptr_t *bits_ptr;
+  /* For small bitsets, the size is fixed.
+     TODO: make bits an array and the size can be passed as template param.  */
+  bits_ptr_t bitset_stack;
+  /* Total number of bits. */
+  unsigned bitset_size;
+  /* Capacity of storage in #bits. */
+  unsigned bitset_capacity;
+
+public:
 
   enum
   {
@@ -23,24 +41,22 @@ public:
 
     /* Cannot use the default constructor. */
     ref();
-  
+
   public:
     /* Reference to the i-th bit in the bitset B. */
     ref(bitset *b, unsigned i)
-    {
-      bitword_ptr = b->bits_ptr[i/BITWORD_SIZE];
-      idx = i%BITWORD_SIZE;
-    }
+      : bitword_ptr(&b->bits_ptr[i/BITWORD_SIZE]),
+        idx(i%BITWORD_SIZE)
+    { }
 
     ref(const ref&) = default;
 
     /* Get a reference to the I-th bit in the bitset B. */
-    const ref& get(bitset *b, unsigned i)
+    ref& get(bitset *b, unsigned i)
     {
-      // TODO: Check this?
-      bits_ptr_t *bp = b->bits_ptr[i/BITWORD_SIZE];
+      bits_ptr_t *bp = &b->bits_ptr[i/BITWORD_SIZE];
       unsigned ip = i%BITWORD_SIZE;
-      /* If pointing to the same bitword. */
+      // If pointing to the same bitword.
       if (bitword_ptr == bp)
       {
         /* If pointing to the same bit. */
@@ -51,9 +67,18 @@ public:
       }
       bitword_ptr = bp;
       idx = ip;
+      return *this;
     }
 
-    ref &operator=(ref t)
+    /* Get a reference to the I-th bit in the bitset B. */
+    bool test(const bitset *b, unsigned i) const
+    {
+      const bits_ptr_t *bp = &b->bits_ptr[i/BITWORD_SIZE];
+      unsigned idx = i%BITWORD_SIZE;
+      return (*bitword_ptr) & (bits_ptr_t(1) << idx);
+    }
+
+    ref &operator=(ref &t)
     {
       *this = bool(t);
       return *this;
@@ -61,10 +86,10 @@ public:
 
     ref &operator=(bool t)
     {
-      bitword_ptr_t &bitword = *bitword_ptr;
-      bitword_ptr_t mask = bitword_ptr_t(1) << idx;
+      bits_ptr_t &bitword = *bitword_ptr;
+      bits_ptr_t mask = bits_ptr_t(1) << idx;
       if (t)
-        bitwordr |= mask;
+        bitword |= mask;
       else
         bitword &= ~mask;
       return *this;
@@ -72,21 +97,11 @@ public:
 
     operator bool() const
     {
-      return (*bitword_ptr) & (bitword_ptr_t(1) << idx);
+      return (*bitword_ptr) & (bits_ptr_t(1) << idx);
     }
   };
 
 private:
-  /* Pointer to the actual bits.  */
-  bits_ptr_t *bits_ptr;
-  /* For small bitsets, the size is fixed.
-     TODO: make bits an array and the size can be passed as template param.  */
-  bits_ptr_t bitset_stack;
-  /* Size of storage in bytes. */
-  unsigned bitset_size;
-  /* Capacity of storage in bytes. */
-  unsigned bitset_capacity;
-
   /* Reference to a bit. */
   ref bits_ref;
 
@@ -105,13 +120,20 @@ public:
     bitset_capacity = bitset_size;
     if (bitset_size > calc_bitset_size(BITSET_STACK_SIZE*CHAR_BIT))
     {
-      bits_ptr = (bits_ptr_t*)XCNEW(bitset_size);
+      //bits_ptr = (bits_ptr_t*)XCNEW(bitset_size);
+      bits_ptr = (bits_ptr_t*)std::malloc(bitset_size/CHAR_BIT);
     }
     else
     {
       bits_ptr = &bitset_stack;
     }
-    init_bitset(bits_ptr, v, bitset_capacity);
+    init_bitset(bits_ptr, v, bitset_capacity/CHAR_BIT);
+  }
+
+  ~bitset()
+  {
+    if (bits_ptr != &bitset_stack)
+      free(bits_ptr);
   }
 
   unsigned calc_bitset_size(unsigned s)
@@ -119,18 +141,18 @@ public:
     return (s + BITWORD_SIZE - 1)/BITWORD_SIZE;
   }
 
-  void init_bitset(bitset_ptr_t *p, bool v, unsigned capacity)
+  void init_bitset(bits_ptr_t *p, bool v, unsigned num)
   {
-    memset(p, 0 - (int)v, capacity);
+    ::memset(p, 0 - (int)v, num);
   }
 
-  /* Returns size in bytes */
+  /* Returns size in #bits */
   unsigned size() const
   {
     return bitset_size;
   }
 
-  /* Returns capacity in bytes */
+  /* Returns capacity in #bits */
   unsigned capacity() const
   {
     return bitset_capacity;
@@ -170,6 +192,7 @@ public:
   /* Set one bit in the bitset. */
   void set(unsigned i)
   {
+    (*this)[i] = true;
   }
 
   /* Set a range of bits in the bitset. */
@@ -180,11 +203,13 @@ public:
   /* Set all the bits in the bitset. */
   void set()
   {
+    set(0, bitset_size);
   }
 
   /* Reset one bit in the bitset. */
   void reset(unsigned i)
   {
+    (*this)[i] = false;
   }
 
   /* Reset a range of bits in the bitset. */
@@ -192,9 +217,10 @@ public:
   {
   }
 
-  /* Reset all the bits in the bitset. */
+  /* Reset all the bits (only the used ones) in the bitset. */
   void reset()
   {
+    reset(0, bitset_size);
   }
 
   /* Return true if all bits in the bitset are set (=1). */
@@ -208,14 +234,14 @@ public:
   }
 
   /* Indexing operator defined in terms of class ref. */
-  ref operator[](unsigned i)
+  ref& operator[](unsigned i)
   {
     return bits_ref.get(this, i);
   }
 
   bool operator[](unsigned i) const
   {
-    return bool(bits_ref.get(this, i));
+    return bits_ref.test(this, i);
   }
 
   const bitset& operator=(const bitset& b)
