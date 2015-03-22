@@ -35,9 +35,11 @@ public:
   class ref
   {
     friend class bitset;
+
+    /* Pointer to one unit. */
+    bits_ptr_t *bitword_ptr;
     /* Index of bit in the bitword. */
     unsigned idx;
-    bits_ptr_t *bitword_ptr;
 
     /* Cannot use the default constructor. */
     ref();
@@ -118,16 +120,17 @@ public:
   {
     bitset_size = calc_bitset_size(s);
     bitset_capacity = bitset_size;
+    unsigned num_bytes = calc_bitset_size(bitset_size)/sizeof(bits_ptr_t);
     if (bitset_size > calc_bitset_size(BITSET_STACK_SIZE*CHAR_BIT))
     {
       //bits_ptr = (bits_ptr_t*)XCNEW(bitset_size);
-      bits_ptr = (bits_ptr_t*)std::malloc(bitset_size/CHAR_BIT);
+      bits_ptr = (bits_ptr_t*)std::malloc(num_bytes);
     }
     else
     {
       bits_ptr = &bitset_stack;
     }
-    init_bitset(bits_ptr, v, bitset_capacity/CHAR_BIT);
+    init_bitset(bits_ptr, v, num_bytes);
   }
 
   ~bitset()
@@ -136,7 +139,8 @@ public:
       free(bits_ptr);
   }
 
-  unsigned calc_bitset_size(unsigned s)
+  /* Number of bitwords required for S bits. */
+  unsigned calc_bitset_size(unsigned s) const
   {
     return (s + BITWORD_SIZE - 1)/BITWORD_SIZE;
   }
@@ -169,15 +173,17 @@ public:
   void invert(unsigned beg, unsigned end)
   {
     assert(beg < end);
+
     unsigned pro_end = beg + (BITWORD_SIZE - beg % BITWORD_SIZE) % BITWORD_SIZE;
     unsigned epi_end = end % BITWORD_SIZE;
+
     for (unsigned i = beg; i < pro_end; ++i)
       invert(i);
+
     assert(!(pro_end % BITWORD_SIZE));
 
     for (unsigned i = 0; i < (end-beg)/BITWORD_SIZE; ++i)
-      bits_ptr[i+beg/BITWORD_SIZE+1] = ~bits_ptr[i+beg/BITWORD_SIZE+1];
-
+      bits_ptr[i + beg/BITWORD_SIZE + 1] = ~bits_ptr[i + beg/BITWORD_SIZE + 1];
 
     for (unsigned i = 0; i < epi_end; ++i)
       invert(end-i-1);
@@ -261,15 +267,26 @@ public:
   /* Logical operations. */
   bitset& operator|=(const bitset& b)
   {
+    assert(bitset_size == b.bitset_size);
+    for (unsigned i = 0; i < calc_bitset_size(bitset_size); ++i)
+      bits_ptr[i] |= b.bits_ptr[i];
+    return *this;
   }
 
   bitset& operator&=(const bitset& b)
   {
+    assert(bitset_size == b.bitset_size);
+    for (unsigned i = 0; i < calc_bitset_size(bitset_size); ++i)
+      bits_ptr[i] &= b.bits_ptr[i];
+    return *this;
   }
 
   bitset& operator^=(const bitset& b)
   {
+    assert(bitset_size == b.bitset_size);
+    for (unsigned i = 0; i < calc_bitset_size(bitset_size); ++i)
+      bits_ptr[i] ^= b.bits_ptr[i];
+    return *this;
   }
 
 };
-
