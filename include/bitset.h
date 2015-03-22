@@ -29,7 +29,9 @@ public:
     /* Number of bits in BITSET_STACK */
     BITSET_STACK_SIZE = sizeof(bitset_stack)*CHAR_BIT,
     /* Number of bits in a word. */
-    BITWORD_SIZE = sizeof(bits_ptr_t)*CHAR_BIT
+    BITWORD_SIZE = sizeof(bits_ptr_t)*CHAR_BIT,
+    BITWORD_ZERO = 0UL,
+    BITWORD_ONES = ~0UL,
   };
 
   /* Reference to a single bit.
@@ -208,19 +210,23 @@ public:
   {
     assert(beg < end);
 
-    unsigned pro_end = beg + (BITWORD_SIZE - beg % BITWORD_SIZE) % BITWORD_SIZE;
-    unsigned epi_end = end % BITWORD_SIZE;
+    unsigned pro_end = beg / BITWORD_SIZE * BITWORD_SIZE;
 
-    for (unsigned i = beg; i < pro_end; ++i)
+    if (pro_end > end)
+      pro_end = end;
+
+    for (unsigned r1 = beg; r1 < pro_end; ++r1)
+      invert(r1);
+
+    unsigned r2 = beg;
+    if (beg % BITWORD_SIZE)
+      r2 = beg / BITWORD_SIZE + 1;
+
+    for (; r2 < end / BITWORD_SIZE; ++r2)
+      bits_ptr[r2] = ~bits_ptr[r2];
+
+    for (unsigned i = end / BITWORD_SIZE * BITWORD_SIZE; i < end; ++i)
       invert(i);
-
-    assert(!(pro_end % BITWORD_SIZE));
-
-    for (unsigned i = 0; i < (end-beg)/BITWORD_SIZE; ++i)
-      bits_ptr[i + beg/BITWORD_SIZE + 1] = ~bits_ptr[i + beg/BITWORD_SIZE + 1];
-
-    for (unsigned i = 0; i < epi_end; ++i)
-      invert(end-i-1);
   }
 
   /* Invert all the bits in the bitset. */
@@ -236,8 +242,26 @@ public:
   }
 
   /* Set a range of bits in the bitset. */
-  void set(unsigned i, unsigned j)
-  {
+  void set(unsigned beg, unsigned end)
+  {    assert(beg < end);
+
+    unsigned pro_end = beg / BITWORD_SIZE * BITWORD_SIZE;
+
+    if (pro_end > end)
+      pro_end = end;
+
+    for (unsigned r1 = beg; r1 < pro_end; ++r1)
+      set(r1);
+
+    unsigned r2 = beg;
+    if (beg % BITWORD_SIZE)
+      r2 = beg / BITWORD_SIZE + 1;
+
+    for (; r2 < end / BITWORD_SIZE; ++r2)
+      bits_ptr[r2] = BITWORD_ONES;
+
+    for (unsigned i = end / BITWORD_SIZE * BITWORD_SIZE; i < end; ++i)
+      set(i);
   }
 
   /* Set all the bits in the bitset. */
@@ -253,8 +277,25 @@ public:
   }
 
   /* Reset a range of bits in the bitset. */
-  void reset(unsigned i, unsigned j)
+  void reset(unsigned beg, unsigned end)
   {
+    unsigned pro_end = beg / BITWORD_SIZE * BITWORD_SIZE;
+
+    if (pro_end > end)
+      pro_end = end;
+
+    for (unsigned r1 = beg; r1 < pro_end; ++r1)
+      reset(r1);
+
+    unsigned r2 = beg;
+    if (beg % BITWORD_SIZE)
+      r2 = beg / BITWORD_SIZE + 1;
+
+    for (; r2 < end / BITWORD_SIZE; ++r2)
+      bits_ptr[r2] = BITWORD_ZERO;
+
+    for (unsigned i = end / BITWORD_SIZE * BITWORD_SIZE; i < end; ++i)
+      reset(i);
   }
 
   /* Reset all the bits (only the used ones) in the bitset. */
