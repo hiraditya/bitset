@@ -76,12 +76,11 @@ public:
       return *this;
     }
 
-    /* Get a reference to the I-th bit in the bitset B. */
-    bool test(const bitset *b, unsigned i) const
+    static bool test(const bitset *b, unsigned i)
     {
       const bits_ptr_t *bp = &b->bits_ptr[i/BITWORD_SIZE];
       unsigned idx = i%BITWORD_SIZE;
-      return (*bitword_ptr) & (bits_ptr_t(1) << idx);
+      return (*bp) & (bits_ptr_t(1) << idx);
     }
 
     ref &operator=(ref &t)
@@ -308,11 +307,19 @@ public:
   /* Return true if all bits in the bitset are set (=1). */
   bool all() const
   {
+    for (unsigned i = 0; i < num_bitwords(size()); ++i)
+      if (bits_ptr[i] != BITWORD_ONES)
+        return false;
+    return true;
   }
 
   /* Return true if any bit in the bitset is set (=1). */
   bool any() const
   {
+    for (unsigned i = 0; i < num_bitwords(size()); ++i)
+      if (bits_ptr[i] != BITWORD_ZEROS)
+        return true;
+    return false;
   }
 
   /* Indexing operator defined in terms of class ref. */
