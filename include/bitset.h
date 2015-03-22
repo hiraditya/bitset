@@ -30,8 +30,8 @@ public:
     BITSET_STACK_SIZE = sizeof(bitset_stack)*CHAR_BIT,
     /* Number of bits in a word. */
     BITWORD_SIZE = sizeof(bits_ptr_t)*CHAR_BIT,
-    BITWORD_ZERO = 0UL,
-    BITWORD_ONES = ~0UL,
+    BITWORD_ZEROS = 0UL,
+    BITWORD_ONES = ~0UL
   };
 
   /* Reference to a single bit.
@@ -241,27 +241,27 @@ public:
     (*this)[i] = true;
   }
 
-  /* Set a range of bits in the bitset. */
+  /* Set a range [beg, end) of bits in the bitset. */
   void set(unsigned beg, unsigned end)
-  {    assert(beg < end);
-
-    unsigned pro_end = beg / BITWORD_SIZE * BITWORD_SIZE;
-
-    if (pro_end > end)
-      pro_end = end;
-
-    for (unsigned r1 = beg; r1 < pro_end; ++r1)
-      set(r1);
-
-    unsigned r2 = beg;
+  {
     if (beg % BITWORD_SIZE)
-      r2 = beg / BITWORD_SIZE + 1;
+    {
+      unsigned pref = BITWORD_ONES >> (beg % BITWORD_SIZE);
+      bits_ptr[beg/BITWORD_SIZE] |= pref;
+    }
 
-    for (; r2 < end / BITWORD_SIZE; ++r2)
-      bits_ptr[r2] = BITWORD_ONES;
+    unsigned i = beg;
+    if (beg % BITWORD_SIZE)
+      i = beg / BITWORD_SIZE + 1;
 
-    for (unsigned i = end / BITWORD_SIZE * BITWORD_SIZE; i < end; ++i)
-      set(i);
+    for (; i < end / BITWORD_SIZE; ++i)
+      bits_ptr[i] = BITWORD_ONES;
+
+    if (end % BITWORD_SIZE)
+    {
+      unsigned suff = BITWORD_ONES << (BITWORD_SIZE - end % BITWORD_ONES);
+      bits_ptr[end/BITWORD_SIZE] |= suff;
+    }
   }
 
   /* Set all the bits in the bitset. */
@@ -276,26 +276,27 @@ public:
     (*this)[i] = false;
   }
 
-  /* Reset a range of bits in the bitset. */
+  /* Reset a range [beg, end) of bits in the bitset. */
   void reset(unsigned beg, unsigned end)
   {
-    unsigned pro_end = beg / BITWORD_SIZE * BITWORD_SIZE;
-
-    if (pro_end > end)
-      pro_end = end;
-
-    for (unsigned r1 = beg; r1 < pro_end; ++r1)
-      reset(r1);
+    if (beg % BITWORD_SIZE)
+    {
+      unsigned pref = BITWORD_ONES << (BITWORD_SIZE - beg % BITWORD_SIZE);
+      bits_ptr[beg/BITWORD_SIZE] &= pref;
+    }
 
     unsigned r2 = beg;
     if (beg % BITWORD_SIZE)
       r2 = beg / BITWORD_SIZE + 1;
 
     for (; r2 < end / BITWORD_SIZE; ++r2)
-      bits_ptr[r2] = BITWORD_ZERO;
+      bits_ptr[r2] = BITWORD_ZEROS;
 
-    for (unsigned i = end / BITWORD_SIZE * BITWORD_SIZE; i < end; ++i)
-      reset(i);
+    if (end % BITWORD_SIZE)
+    {
+      unsigned suff = BITWORD_ONES >> (end % BITWORD_ONES);
+      bits_ptr[end/BITWORD_SIZE] &= suff;
+    }
   }
 
   /* Reset all the bits (only the used ones) in the bitset. */
