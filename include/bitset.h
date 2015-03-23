@@ -147,8 +147,6 @@ public:
   unsigned num_bitwords(unsigned s) const
   {
     unsigned t = (s + BITWORD_SIZE - 1)/BITWORD_SIZE;
-    // TODO: Remove after testing.
-    assert(!(t % CHAR_BIT));
     return t;
   }
 

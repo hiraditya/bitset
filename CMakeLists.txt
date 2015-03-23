@@ -10,13 +10,13 @@ include_directories(include)
 
 
 # Flags to be passed to the C++ compiler
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -std=c++0x -pedantic -Wall")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O0 -std=c++0x -pedantic -Wall")
 
 
 # Add DNDEBUG to stop printing the messages.
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -std=c++0x -pedantic -Wall -DNDEBUG")
 # Flags to be passed to the C compiler
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -pedantic -Wall")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g  -O0 -pedantic -Wall")
 
 
 # Subdirectories to be included for recursive build.
