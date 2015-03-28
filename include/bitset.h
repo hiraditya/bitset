@@ -139,6 +139,24 @@ public:
     init_bitset(bits_ptr, v, num_bytes);
   }
 
+  bitset(const bitset& b)
+    : bitset_size(b.bitset_size), bits_ref(this, 0)
+  {
+    unsigned num_bytes = bitword_size_bytes(bitset_size);
+    if (bitset_size > SMALL_BITSET_SIZE)
+    {
+      //bits_ptr = (bits_ptr_t*)XCNEW(num_bytes);
+      bits_ptr = (bits_ptr_t*)std::malloc(num_bytes);
+    }
+    else
+    {
+      bits_ptr = &small_bitset;
+    }
+    assert(bits_ptr != NULL);
+    bitset_capacity = num_bitwords(bitset_size)*BITWORD_SIZE;
+    *this = b;
+  }
+
   ~bitset()
   {
     if (bits_ptr != &small_bitset)
@@ -190,7 +208,10 @@ public:
     /* Since bitset_capacity is atleast BITWORD_STACK_SIZE big,
        we would always malloc at this point. */
     if (bits_ptr != &small_bitset)
+    {
+      assert(bits_ptr != NULL);
       free(bits_ptr);
+    }
     bits_ptr = (bits_ptr_t*)std::malloc(bitword_size_bytes(capacity));
     assert(bits_ptr != NULL);
     bitset_capacity = num_bitwords(capacity);
@@ -200,7 +221,7 @@ public:
   /* Invert one bit in the bitset. */
   void invert(unsigned i)
   {
-    bits_ptr[i/BITWORD_SIZE] ^= bits_ptr_t(1) << (i % BITWORD_SIZE);
+    bits_ptr[i/BITWORD_SIZE] ^= bits_ptr_t(1) << (BITWORD_SIZE - (i % BITWORD_SIZE) - 1);
   }
 
   /* Invert a range of bits in the bitset.
@@ -328,7 +349,7 @@ public:
   }
 
   /* Indexing operator defined in terms of class ref. */
-  ref& operator[](unsigned i)
+  ref operator[](unsigned i)
   {
     return bits_ref.set(this, i);
   }
@@ -344,13 +365,15 @@ public:
     return *this;
   }
 
-  /* Equality comparison. Strict equality comparison. */
+  /* Equality comparison. Strict equality comparison.
+     FIXME: This is highly inefficient. Improve this by initializing
+     unused bits in the bitset to zero.  */
   bool operator==(const bitset& b) const
   {
     if (bitset_size != b.bitset_size)
       return false;
     for (unsigned i = 0; i < bitset_size; ++i)
-      if (bits_ptr[i] != b.bits_ptr[i])
+      if ((*this)[i] != b[i])
         return false;
     return true;
   }
