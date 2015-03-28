@@ -16,8 +16,8 @@ private:
   bits_ptr_t *bits_ptr;
   /* For small bitsets, the size is fixed.
      TODO: make bits an array and the size can be passed as template param.  */
-  bits_ptr_t bitset_stack;
-  /* Total number of bits. */
+  bits_ptr_t small_bitset;
+  /* Storage (#bits) exposed to the user. */
   unsigned bitset_size;
   /* Capacity of storage in #bits. */
   unsigned bitset_capacity;
@@ -26,8 +26,8 @@ public:
 
   enum
   {
-    /* Number of bits in BITSET_STACK */
-    BITSET_STACK_SIZE = sizeof(bitset_stack)*CHAR_BIT,
+    /* Number of bits in SMALL_BITSET */
+    SMALL_BITSET_SIZE = sizeof(small_bitset)*CHAR_BIT,
     /* Number of bits in a word. */
     BITWORD_SIZE = sizeof(bits_ptr_t)*CHAR_BIT,
     BITWORD_ZEROS = 0UL,
@@ -57,8 +57,8 @@ public:
 
     ref(const ref&) = default;
 
-    /* Get a reference to the I-th bit in the bitset B. */
-    ref& get(bitset *b, unsigned i)
+    /* Set the reference to the I-th bit in the bitset B. */
+    ref& set(bitset *b, unsigned i)
     {
       bits_ptr_t *bp = &b->bits_ptr[i/BITWORD_SIZE];
       unsigned ip = i%BITWORD_SIZE;
@@ -80,19 +80,21 @@ public:
     {
       const bits_ptr_t *bp = &b->bits_ptr[i/BITWORD_SIZE];
       unsigned idx = i%BITWORD_SIZE;
-      return (*bp) & (bits_ptr_t(1) << idx);
+      return (*bp) & (bits_ptr_t(1) << (BITWORD_SIZE - idx - 1));
     }
 
     ref &operator=(ref &t)
     {
-      *this = bool(t);
+      //*this = bool(t);
+      bitword_ptr = t.bitword_ptr;
+      idx = t.idx;
       return *this;
     }
 
     ref &operator=(bool t)
     {
       bits_ptr_t &bitword = *bitword_ptr;
-      bits_ptr_t mask = bits_ptr_t(1) << idx;
+      bits_ptr_t mask = bits_ptr_t(1) << (BITWORD_SIZE - idx - 1);
       if (t)
         bitword |= mask;
       else
@@ -102,7 +104,7 @@ public:
 
     operator bool() const
     {
-      return (*bitword_ptr) & (bits_ptr_t(1) << idx);
+      return (*bitword_ptr) & (bits_ptr_t(1) << (BITWORD_SIZE - idx - 1));
     }
   };
 
@@ -113,8 +115,8 @@ private:
 public:
 
   bitset()
-    : bits_ptr(&bitset_stack), bitset_stack(0),
-      bitset_size(BITSET_STACK_SIZE), bitset_capacity(bitset_size),
+    : bits_ptr(&small_bitset), small_bitset(0),
+      bitset_size(SMALL_BITSET_SIZE), bitset_capacity(bitset_size),
       bits_ref(this, 0)
   { }
 
@@ -122,14 +124,14 @@ public:
     : bits_ref(this, 0)
   {
     unsigned num_bytes = bitword_size_bytes(s);
-    if (s > BITSET_STACK_SIZE)
+    if (s > SMALL_BITSET_SIZE)
     {
       //bits_ptr = (bits_ptr_t*)XCNEW(num_bytes);
       bits_ptr = (bits_ptr_t*)std::malloc(num_bytes);
     }
     else
     {
-      bits_ptr = &bitset_stack;
+      bits_ptr = &small_bitset;
     }
     assert(bits_ptr != NULL);
     bitset_capacity = num_bitwords(s)*BITWORD_SIZE;
@@ -139,7 +141,7 @@ public:
 
   ~bitset()
   {
-    if (bits_ptr != &bitset_stack)
+    if (bits_ptr != &small_bitset)
       free(bits_ptr);
   }
 
@@ -187,7 +189,7 @@ public:
 
     /* Since bitset_capacity is atleast BITWORD_STACK_SIZE big,
        we would always malloc at this point. */
-    if (bits_ptr != &bitset_stack)
+    if (bits_ptr != &small_bitset)
       free(bits_ptr);
     bits_ptr = (bits_ptr_t*)std::malloc(bitword_size_bytes(capacity));
     assert(bits_ptr != NULL);
@@ -320,15 +322,15 @@ public:
     return false;
   }
 
+  bool operator[](unsigned i) const
+  {
+    return ref::test(this, i);
+  }
+
   /* Indexing operator defined in terms of class ref. */
   ref& operator[](unsigned i)
   {
-    return bits_ref.get(this, i);
-  }
-
-  bool operator[](unsigned i) const
-  {
-    return bits_ref.test(this, i);
+    return bits_ref.set(this, i);
   }
 
   const bitset& operator=(const bitset& b)

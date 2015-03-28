@@ -1,5 +1,16 @@
 #include<bitset.h>
 #include<cassert>
+#include<iostream>
+
+void print_bit(bitset *b, unsigned i)
+{
+
+  std::cout << "\nTesting bit:" << i << ": ";
+  if(b[i])
+    std::cout<<"True";
+  else
+    std::cout<<"False";
+}
 
 int test1()
 {
@@ -50,7 +61,9 @@ int test4()
 
   b.set(10, 80);
   for (int i = 10; i < 80; ++i)
+  {
     assert(b[i] == true);
+  }
   return 0;
 }
 
