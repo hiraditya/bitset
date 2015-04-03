@@ -2,10 +2,10 @@
   Bitset implementation.
 */
 
-#include<climits>
-#include<cassert>
-#include<cstdlib>
-#include<cstring>
+#include <climits>
+#include <cassert>
+#include <cstdlib>
+#include <cstring>
 
 class bitset {
 public:
@@ -14,11 +14,14 @@ public:
 private:
   /* Pointer to the actual bits.  */
   bits_ptr_t *bits_ptr;
+
   /* For small bitsets, the size is fixed.
      TODO: make bits an array and the size can be passed as template param.  */
   bits_ptr_t small_bitset;
+
   /* Storage (#bits) exposed to the user. */
   unsigned bitset_size;
+
   /* Capacity of storage in #bits. */
   unsigned bitset_capacity;
 
@@ -27,9 +30,9 @@ public:
   enum
   {
     /* Number of bits in SMALL_BITSET */
-    SMALL_BITSET_SIZE = sizeof(small_bitset)*CHAR_BIT,
+    SMALL_BITSET_SIZE = sizeof(small_bitset) * CHAR_BIT,
     /* Number of bits in a word. */
-    BITWORD_SIZE = sizeof(bits_ptr_t)*CHAR_BIT,
+    BITWORD_SIZE = sizeof(bits_ptr_t) * CHAR_BIT,
     BITWORD_ZEROS = 0UL,
     BITWORD_ONES = ~0UL
   };
@@ -51,7 +54,7 @@ public:
   public:
     /* Reference to the i-th bit in the bitset B. */
     ref(bitset *b, unsigned i)
-      : bitword_ptr(&b->bits_ptr[i/BITWORD_SIZE]),
+      : bitword_ptr(&b->bits_ptr[i / BITWORD_SIZE]),
         idx(i%BITWORD_SIZE)
     { }
 
@@ -60,8 +63,8 @@ public:
     /* Set the reference to the I-th bit in the bitset B. */
     ref& set(bitset *b, unsigned i)
     {
-      bits_ptr_t *bp = &b->bits_ptr[i/BITWORD_SIZE];
-      unsigned ip = i%BITWORD_SIZE;
+      bits_ptr_t *bp = &b->bits_ptr[i / BITWORD_SIZE];
+      unsigned ip = i % BITWORD_SIZE;
       // If pointing to the same bitword.
       if (bitword_ptr == bp)
       {
@@ -78,8 +81,8 @@ public:
 
     static bool test(const bitset *b, unsigned i)
     {
-      const bits_ptr_t *bp = &b->bits_ptr[i/BITWORD_SIZE];
-      unsigned idx = i%BITWORD_SIZE;
+      const bits_ptr_t *bp = &b->bits_ptr[i / BITWORD_SIZE];
+      unsigned idx = i % BITWORD_SIZE;
       return (*bp) & (bits_ptr_t(1) << (BITWORD_SIZE - idx - 1));
     }
 
@@ -127,14 +130,16 @@ public:
     if (s > SMALL_BITSET_SIZE)
     {
       //bits_ptr = (bits_ptr_t*)XCNEW(num_bytes);
-      bits_ptr = (bits_ptr_t*)std::malloc(num_bytes);
+      bits_ptr = (bits_ptr_t *)std::malloc(num_bytes);
     }
     else
     {
       bits_ptr = &small_bitset;
     }
+
     assert(bits_ptr != NULL);
-    bitset_capacity = num_bitwords(s)*BITWORD_SIZE;
+
+    bitset_capacity = num_bitwords(s) * BITWORD_SIZE;
     bitset_size = s;
     init_bitset(bits_ptr, v, num_bytes);
   }
@@ -146,14 +151,16 @@ public:
     if (bitset_size > SMALL_BITSET_SIZE)
     {
       //bits_ptr = (bits_ptr_t*)XCNEW(num_bytes);
-      bits_ptr = (bits_ptr_t*)std::malloc(num_bytes);
+      bits_ptr = (bits_ptr_t *)std::malloc(num_bytes);
     }
     else
     {
       bits_ptr = &small_bitset;
     }
+
     assert(bits_ptr != NULL);
-    bitset_capacity = num_bitwords(bitset_size)*BITWORD_SIZE;
+
+    bitset_capacity = num_bitwords(bitset_size) * BITWORD_SIZE;
     *this = b;
   }
 
@@ -166,7 +173,7 @@ public:
   /* Number of bitwords required for S bits. */
   unsigned num_bitwords(unsigned s) const
   {
-    unsigned t = (s + BITWORD_SIZE - 1)/BITWORD_SIZE;
+    unsigned t = (s + BITWORD_SIZE - 1) / BITWORD_SIZE;
     return t;
   }
 
@@ -175,7 +182,7 @@ public:
      If yes, then inlining can cause trouble here. */
   unsigned bitword_size_bytes(unsigned s) const
   {
-    return num_bitwords(s)*BITWORD_SIZE/CHAR_BIT;
+    return num_bitwords(s) * BITWORD_SIZE / CHAR_BIT;
   }
 
   void init_bitset(bits_ptr_t *p, bool v, unsigned num)
@@ -210,10 +217,13 @@ public:
     if (bits_ptr != &small_bitset)
     {
       assert(bits_ptr != NULL);
+
       free(bits_ptr);
     }
-    bits_ptr = (bits_ptr_t*)std::malloc(bitword_size_bytes(capacity));
+    bits_ptr = (bits_ptr_t *)std::malloc(bitword_size_bytes(capacity));
+
     assert(bits_ptr != NULL);
+
     bitset_capacity = num_bitwords(capacity);
     return bitset_capacity;
   }
@@ -267,7 +277,7 @@ public:
     if (beg % BITWORD_SIZE)
     {
       bits_ptr_t pref = BITWORD_ONES >> (beg % BITWORD_SIZE);
-      bits_ptr[beg/BITWORD_SIZE] |= pref;
+      bits_ptr[beg / BITWORD_SIZE] |= pref;
     }
 
     unsigned i = beg;
@@ -280,7 +290,7 @@ public:
     if (end % BITWORD_SIZE)
     {
       bits_ptr_t suff = BITWORD_ONES << (BITWORD_SIZE - end % BITWORD_ONES);
-      bits_ptr[end/BITWORD_SIZE] |= suff;
+      bits_ptr[end / BITWORD_SIZE] |= suff;
     }
   }
 
@@ -302,7 +312,7 @@ public:
     if (beg % BITWORD_SIZE)
     {
       bits_ptr_t pref = BITWORD_ONES << (BITWORD_SIZE - beg % BITWORD_SIZE);
-      bits_ptr[beg/BITWORD_SIZE] &= pref;
+      bits_ptr[beg / BITWORD_SIZE] &= pref;
     }
 
     unsigned r2 = beg;
@@ -315,7 +325,7 @@ public:
     if (end % BITWORD_SIZE)
     {
       bits_ptr_t suff = BITWORD_ONES >> (end % BITWORD_ONES);
-      bits_ptr[end/BITWORD_SIZE] &= suff;
+      bits_ptr[end / BITWORD_SIZE] &= suff;
     }
   }
 
@@ -387,6 +397,7 @@ public:
   bitset& operator|=(const bitset& b)
   {
     assert(bitset_size == b.bitset_size);
+
     for (unsigned i = 0; i < num_bitwords(bitset_size); ++i)
       bits_ptr[i] |= b.bits_ptr[i];
     return *this;
@@ -395,6 +406,7 @@ public:
   bitset& operator&=(const bitset& b)
   {
     assert(bitset_size == b.bitset_size);
+
     for (unsigned i = 0; i < num_bitwords(bitset_size); ++i)
       bits_ptr[i] &= b.bits_ptr[i];
     return *this;
