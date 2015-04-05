@@ -1,3 +1,9 @@
+# Bitset implementation.
+#
+#  Copyright [2015-] Aditya Kumar.
+#  This file is distributed under the GPL v3 License. See LICENSE for details.
+#
+
 cmake_minimum_required(VERSION 2.8)
 set(test
   test1.cpp
