@@ -60,11 +60,15 @@ public:
 
     ref(const ref&) = default;
 
-    /* Set the reference to the I-th bit in the bitset B. */
-    ref& set(bitset *b, unsigned i)
+    ref &operator=(ref &t)
     {
-      bits_ptr_t *bp = &b->bits_ptr[i / BITWORD_SIZE];
-      unsigned ip = i % BITWORD_SIZE;
+      //*this = bool(t);
+
+      //second method: bitword_ptr = t.bitword_ptr;
+      //idx = t.idx;
+
+      bits_ptr_t *bp = t.bitword_ptr;
+      unsigned ip = t.idx;
       // If pointing to the same bitword.
       if (bitword_ptr == bp)
       {
@@ -76,21 +80,6 @@ public:
       }
       bitword_ptr = bp;
       idx = ip;
-      return *this;
-    }
-
-    static bool test(const bitset *b, unsigned i)
-    {
-      const bits_ptr_t *bp = &b->bits_ptr[i / BITWORD_SIZE];
-      unsigned idx = i % BITWORD_SIZE;
-      return (*bp) & (bits_ptr_t(1) << (BITWORD_SIZE - idx - 1));
-    }
-
-    ref &operator=(ref &t)
-    {
-      //*this = bool(t);
-      bitword_ptr = t.bitword_ptr;
-      idx = t.idx;
       return *this;
     }
 
@@ -111,20 +100,12 @@ public:
     }
   };
 
-private:
-  /* Reference to a bit. */
-  ref bits_ref;
-
-public:
-
   bitset()
     : bits_ptr(&small_bitset), small_bitset(0),
-      bitset_size(SMALL_BITSET_SIZE), bitset_capacity(bitset_size),
-      bits_ref(this, 0)
+      bitset_size(SMALL_BITSET_SIZE), bitset_capacity(bitset_size)
   { }
 
   bitset(unsigned s, bool v = false)
-    : bits_ref(this, 0)
   {
     unsigned num_bytes = bitword_size_bytes(s);
     if (s > SMALL_BITSET_SIZE)
@@ -145,7 +126,7 @@ public:
   }
 
   bitset(const bitset& b)
-    : bitset_size(b.bitset_size), bits_ref(this, 0)
+    : bitset_size(b.bitset_size)
   {
     unsigned num_bytes = bitword_size_bytes(bitset_size);
     if (bitset_size > SMALL_BITSET_SIZE)
@@ -265,6 +246,25 @@ public:
     invert(0, bitset_size);
   }
 
+  /* Set the reference to the I-th bit in the bitset B. */
+  static ref& fast_set(ref &r, bitset *b, unsigned i)
+  {
+    bits_ptr_t *bp = &b->bits_ptr[i / BITWORD_SIZE];
+    unsigned ip = i % BITWORD_SIZE;
+    // If pointing to the same bitword.
+    if (r.bitword_ptr == bp)
+    {
+      /* If pointing to the same bit. */
+      if (r.idx == ip)
+        return r;
+      r.idx = ip;
+      return r;
+    }
+    r.bitword_ptr = bp;
+    r.idx = ip;
+    return r;
+  }
+
   /* Set one bit in the bitset. */
   void set(unsigned i)
   {
@@ -353,15 +353,22 @@ public:
     return false;
   }
 
+  bool test(unsigned i) const
+  {
+    const bits_ptr_t *bp = &bits_ptr[i / BITWORD_SIZE];
+    unsigned idx = i % BITWORD_SIZE;
+    return (*bp) & (bits_ptr_t(1) << (BITWORD_SIZE - idx - 1));
+  }
+
   bool operator[](unsigned i) const
   {
-    return ref::test(this, i);
+    return test(i);
   }
 
   /* Indexing operator defined in terms of class ref. */
   ref operator[](unsigned i)
   {
-    return bits_ref.set(this, i);
+    return ref(this, i);
   }
 
   const bitset& operator=(const bitset& b)
