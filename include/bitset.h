@@ -9,6 +9,10 @@
 #include <cstdlib>
 #include <cstring>
 
+/* Only to make it compatible with llvm/bitset
+   so that llvm/ADT google tests can work.
+#define invert flip  */
+
 class bitset {
 public:
   typedef unsigned long bits_ptr_t;
@@ -57,7 +61,7 @@ public:
     /* Reference to the i-th bit in the bitset B. */
     ref(bitset *b, unsigned i)
       : bitword_ptr(&b->bits_ptr[i / BITWORD_SIZE]),
-        idx(i%BITWORD_SIZE)
+        idx(i % BITWORD_SIZE)
     { }
 
     ref(const ref&) = default;
@@ -104,7 +108,7 @@ public:
 
   bitset()
     : bits_ptr(&small_bitset), small_bitset(0),
-      bitset_size(SMALL_BITSET_SIZE), bitset_capacity(bitset_size)
+      bitset_size(0), bitset_capacity(SMALL_BITSET_SIZE)
   { }
 
   bitset(unsigned s, bool v = false)
@@ -185,9 +189,15 @@ public:
     return bitset_capacity;
   }
 
+  bool empty() const
+  {
+    return !size();
+  }
+
   /* Resizes the bitset so that it can hold minumum of CAPACITY bits.
-     Does not initialize the values. */
-  unsigned resize(unsigned capacity)
+     Does not initialize the values.
+     TODO: Make this function private.  */
+  unsigned resize_capacity(unsigned capacity)
   {
     /* When there is enough space then no need to reallocate.
        This however, can be inefficient in cases when the bitset
@@ -207,19 +217,35 @@ public:
 
     assert(bits_ptr != NULL);
 
-    bitset_capacity = num_bitwords(capacity);
+    bitset_capacity = num_bitwords(capacity) * BITWORD_SIZE;
+    return bitset_capacity;
+  }
+
+  // TODO: Check this.
+  unsigned resize(unsigned N, bool init = false)
+  {
+    unsigned old_capacity = bitset_capacity;
+    if (old_capacity < num_bitwords(N) * BITWORD_SIZE)
+    {
+      resize_capacity(num_bitwords(N));
+      init_bitset(bits_ptr + old_capacity, init,
+                  bitword_size_bytes(bitset_capacity - old_capacity));
+    }
+
     return bitset_capacity;
   }
 
   /* Invert one bit in the bitset. */
-  void invert(unsigned i)
+  bitset &invert(unsigned i)
   {
-    bits_ptr[i/BITWORD_SIZE] ^= bits_ptr_t(1) << (BITWORD_SIZE - (i % BITWORD_SIZE) - 1);
+    bits_ptr[i/BITWORD_SIZE] ^= bits_ptr_t(1)
+            << (BITWORD_SIZE - (i % BITWORD_SIZE) - 1);
+    return *this;
   }
 
   /* Invert a range of bits in the bitset.
      End is one past the end element we want to invert. */
-  void invert(unsigned beg, unsigned end)
+  bitset &invert(unsigned beg, unsigned end)
   {
     assert(beg < end);
 
@@ -240,12 +266,14 @@ public:
 
     for (unsigned i = end / BITWORD_SIZE * BITWORD_SIZE; i < end; ++i)
       invert(i);
+    return *this;
   }
 
   /* Invert all the bits in the bitset. */
-  void invert()
+  bitset &invert()
   {
     invert(0, bitset_size);
+    return *this;
   }
 
   /* Set the reference to the I-th bit in the bitset B. */
@@ -303,13 +331,14 @@ public:
   }
 
   /* Reset one bit in the bitset. */
-  void reset(unsigned i)
+  bitset &reset(unsigned i)
   {
     (*this)[i] = false;
+    return *this;
   }
 
   /* Reset a range [beg, end) of bits in the bitset. */
-  void reset(unsigned beg, unsigned end)
+  bitset &reset(unsigned beg, unsigned end)
   {
     if (beg % BITWORD_SIZE)
     {
@@ -329,12 +358,19 @@ public:
       bits_ptr_t suff = BITWORD_ONES >> (end % BITWORD_ONES);
       bits_ptr[end / BITWORD_SIZE] &= suff;
     }
+    return *this;
   }
 
   /* Reset all the bits (only the used ones) in the bitset. */
-  void reset()
+  bitset &reset()
   {
     reset(0, bitset_size);
+    return *this;
+  }
+
+  void clear()
+  {
+    bitset_size = 0;
   }
 
   /* Return true if all bits in the bitset are set (=1). */
@@ -353,6 +389,22 @@ public:
       if (bits_ptr[i] != BITWORD_ZEROS)
         return true;
     return false;
+  }
+
+  bool none() const
+  {
+    return !any();
+  }
+
+  unsigned count() const
+  {
+    unsigned n = 0;
+    for (unsigned i = 0; i < size(); ++i)
+      if ((*this)[i])
+        ++n;
+    return n;
+    //for (unsigned i = 0; i < num_bitwords(size()); ++i)
+    //return __builtin_popcount()
   }
 
   bool test(unsigned i) const
@@ -376,7 +428,7 @@ public:
   const bitset& operator=(const bitset& b)
   {
     bitset_size = b.bitset_size;
-    bitset_capacity = resize(b.bitset_capacity);
+    bitset_capacity = resize_capacity(b.bitset_capacity);
 
     assert(bitset_capacity >= b.bitset_capacity);
 
