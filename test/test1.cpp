@@ -20,7 +20,7 @@ void print_bit(const bitset &b, unsigned i)
 int test1()
 {
   bitset b;
-  assert(b.size() == sizeof(unsigned long)*CHAR_BIT);
+  assert(b.size() == 0);
   return b[0];
 }
 
