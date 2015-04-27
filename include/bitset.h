@@ -9,10 +9,6 @@
 #include <cstdlib>
 #include <cstring>
 
-/* Only to make it compatible with llvm/bitset
-   so that llvm/ADT google tests can work.
-#define invert flip  */
-
 class bitset {
 public:
   typedef unsigned long bits_ptr_t;
@@ -227,11 +223,19 @@ public:
     unsigned old_capacity = bitset_capacity;
     if (old_capacity < num_bitwords(N) * BITWORD_SIZE)
     {
-      resize_capacity(num_bitwords(N));
-      init_bitset(bits_ptr + old_capacity, init,
-                  bitword_size_bytes(bitset_capacity - old_capacity));
+      resize_capacity(N);
     }
 
+    if (bitset_size < N)
+    {
+      if (init)
+        set (bitset_size, N);
+      else
+        reset (bitset_size, N);
+    }
+
+    bitset_size = N;
+    //reset (bitset_size, bitset_capacity);
     return bitset_capacity;
   }
 
@@ -262,7 +266,10 @@ public:
       r2 = beg / BITWORD_SIZE + 1;
 
     for (; r2 < end / BITWORD_SIZE; ++r2)
-      bits_ptr[r2] = ~bits_ptr[r2];
+    {
+      bits_ptr_t temp = bits_ptr[r2];
+      bits_ptr[r2] = ~temp;
+    }
 
     for (unsigned i = end / BITWORD_SIZE * BITWORD_SIZE; i < end; ++i)
       invert(i);
@@ -304,6 +311,14 @@ public:
   /* Set a range [beg, end) of bits in the bitset. */
   void set(unsigned beg, unsigned end)
   {
+    // TODO: Optimize this.
+    if (beg / BITWORD_SIZE == end / BITWORD_SIZE)
+    {
+      for (unsigned i = beg; i < end; ++i)
+        (*this)[i] = true;
+      return;
+    }
+
     if (beg % BITWORD_SIZE)
     {
       bits_ptr_t pref = BITWORD_ONES >> (beg % BITWORD_SIZE);
@@ -319,7 +334,7 @@ public:
 
     if (end % BITWORD_SIZE)
     {
-      bits_ptr_t suff = BITWORD_ONES << (BITWORD_SIZE - end % BITWORD_ONES);
+      bits_ptr_t suff = BITWORD_ONES << (BITWORD_SIZE - end % BITWORD_SIZE);
       bits_ptr[end / BITWORD_SIZE] |= suff;
     }
   }
@@ -340,6 +355,14 @@ public:
   /* Reset a range [beg, end) of bits in the bitset. */
   bitset &reset(unsigned beg, unsigned end)
   {
+    // TODO: Optimize this.
+    if (beg / BITWORD_SIZE == end / BITWORD_SIZE)
+    {
+      for (unsigned i = beg; i < end; ++i)
+        (*this)[i] = false;
+      return *this;
+    }
+
     if (beg % BITWORD_SIZE)
     {
       bits_ptr_t pref = BITWORD_ONES << (BITWORD_SIZE - beg % BITWORD_SIZE);
@@ -355,7 +378,7 @@ public:
 
     if (end % BITWORD_SIZE)
     {
-      bits_ptr_t suff = BITWORD_ONES >> (end % BITWORD_ONES);
+      bits_ptr_t suff = BITWORD_ONES >> (end % BITWORD_SIZE);
       bits_ptr[end / BITWORD_SIZE] &= suff;
     }
     return *this;
@@ -376,10 +399,7 @@ public:
   /* Return true if all bits in the bitset are set (=1). */
   bool all() const
   {
-    for (unsigned i = 0; i < num_bitwords(size()); ++i)
-      if (bits_ptr[i] != BITWORD_ONES)
-        return false;
-    return true;
+    return test();
   }
 
   /* Return true if any bit in the bitset is set (=1). */
@@ -407,11 +427,28 @@ public:
     //return __builtin_popcount()
   }
 
+  /* Test if i-th bit is true.  */
   bool test(unsigned i) const
   {
     const bits_ptr_t *bp = &bits_ptr[i / BITWORD_SIZE];
     unsigned idx = i % BITWORD_SIZE;
     return (*bp) & (bits_ptr_t(1) << (BITWORD_SIZE - idx - 1));
+  }
+
+  /* Test if bits [beg, end) are true.  */
+  // TODO: Optimize this.
+  bool test(unsigned beg, unsigned end) const
+  {
+    for (unsigned i = beg; i < end; ++i)
+      if (!test(i))
+        return false;
+    return true;
+  }
+
+  /* Test if all bits are true.  */
+  bool test() const
+  {
+    return test(0, bitset_size);
   }
 
   bool operator[](unsigned i) const
